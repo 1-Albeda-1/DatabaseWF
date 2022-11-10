@@ -8,6 +8,8 @@ namespace UserStoryAir.Models
 {
     public class Reys
     {
+
+            public Guid Id { get; set; }
             /// <summary>
             /// Номер рейса
             /// </summary>
@@ -40,5 +42,8 @@ namespace UserStoryAir.Models
             /// Процент надбавки за обслуживание
             /// </summary>
             public decimal allowance { get; set; }
+
+            public decimal Sum { get; set; }
+            public string proverka { get; set; }
     }
 }

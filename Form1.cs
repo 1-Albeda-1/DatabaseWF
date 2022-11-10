@@ -13,17 +13,12 @@ namespace UserStoryAir
 {
     public partial class Аэропорт : Form
     {
-        private readonly List<Reys> reys;
-        private readonly BindingSource bindingSource;
-        private decimal sum = 0;
         public Аэропорт()
         {
             InitializeComponent();
             dataGridView1.AutoGenerateColumns = false;
-            reys = new List<Reys>();
-            bindingSource = new BindingSource();
-            bindingSource.DataSource = reys;
-            dataGridView1.DataSource = bindingSource;
+            dataGridView1.DataSource = ReadDB();
+            CalculateStats();
         }
 
         private void выходToolStripMenuItem_Click(object sender, EventArgs e)
@@ -41,26 +36,15 @@ namespace UserStoryAir
         private void addtool_Click(object sender, EventArgs e)
         {
             var infoForm = new ReysInfoForm();
-            infoForm.Text = "Добавить студента";
+            infoForm.Text = "Добавить рейс";
             if (infoForm.ShowDialog(this) == DialogResult.OK)
             {
-                reys.Add(infoForm.Reys);
-                bindingSource.ResetBindings(false);
-                CalculateStats();
+                CreateDB(infoForm);
             }
         }
 
         private void dataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
-
-            if (dataGridView1.Columns[e.ColumnIndex].Name == "Column9")
-            {
-                var data = (Reys)dataGridView1.Rows[e.RowIndex].DataBoundItem;
-                sum += (data.NumberPassengers * data.SborP + data.NumberCrew * data.SborC) * ((100.00m + data.allowance) / 100.0m);
-                e.Value = sum;
-                sum = 0;
-            }
-
             if (dataGridView1.Columns[e.ColumnIndex].Name == "Column2")
             {
                 var val = (plane)e.Value;
@@ -98,16 +82,14 @@ namespace UserStoryAir
                 "Удадение записи",
                 MessageBoxButtons.YesNo) == DialogResult.Yes)
             {
-                reys.Remove(data);
-                bindingSource.ResetBindings(false);
-                CalculateStats();
+                DeliteDB(data);
             }
         }
         private void ChangeTool_Click(object sender, EventArgs e)
         {
             var data = (Reys)dataGridView1.Rows[dataGridView1.SelectedRows[0].Index].DataBoundItem;
             var infoform = new ReysInfoForm(data);
-            infoform.Text = "Реадактировать студента";
+            infoform.Text = "Реадактировать Рейс";
             if (infoform.ShowDialog(this) == DialogResult.OK)
             {
                 data.NumberReys = infoform.Reys.NumberReys;
@@ -118,8 +100,8 @@ namespace UserStoryAir
                 data.SborC = infoform.Reys.SborC;
                 data.allowance = infoform.Reys.allowance;
                 data.arrivalTime = infoform.Reys.arrivalTime;
-                bindingSource.ResetBindings(false);
-                CalculateStats();
+                data.Sum = (data.NumberPassengers * data.SborP + data.NumberCrew * data.SborC) * ((100.00m + data.allowance) / 100.0m);
+                UpDateDB(data);
             }
         }
 
@@ -140,22 +122,79 @@ namespace UserStoryAir
 
         public void CalculateStats()
         {
-            var count = reys.Count;
+            var count = ReadDB().Count;
             var Summa = 0.0m;
             var pas = 0.0m;
             var Ekip = 0.0m;
             РейсыStripStatusLabel1.Text = $"Кол-во рейсов: " + count;
-            foreach (var rey in reys)
+            foreach (var rey in ReadDB())
             {
                 pas += rey.NumberPassengers;
                 Ekip += rey.NumberCrew;
-                Summa += (rey.NumberPassengers * rey.SborP + rey.NumberCrew * rey.SborC) * ((100.00m + rey.allowance) / 100.0m);
+                Summa += rey.Sum;
             }
             ВыручкаStripStatusLabel2.Text = $"Сумма всей выручки: " + Summa;
             ПассажирыStripStatusLabel2.Text = $"Кол-во пассажиров: " + pas;
             ЭкипажStripStatusLabel2.Text = $"Кол-во экипажа:" + Ekip;
         }
 
+        private List<Reys> ReadDB()
+        {
+            using (ApplicationContext db = new ApplicationContext(DataBaseHelper.Options()))
+            {
+                return db.ReysBD.ToList();
+            }
+        }
+ 
+        private void CreateDB(ReysInfoForm infoform)
+        {
+            using (ApplicationContext db = new ApplicationContext(DataBaseHelper.Options()))
+            {
+                infoform.Reys.Id = Guid.NewGuid();
+                infoform.Reys.Sum = (infoform.Reys.NumberPassengers * infoform.Reys.SborP + infoform.Reys.NumberCrew * infoform.Reys.SborC) * ((100.00m + infoform.Reys.allowance) / 100.0m);
+                db.ReysBD.Add(infoform.Reys);
+                db.SaveChanges();
+                dataGridView1.DataSource = db.ReysBD.ToList();
+                CalculateStats();
+            }
+        }
+
+        private void UpDateDB(Reys reys)
+        {
+            using (ApplicationContext db = new ApplicationContext(DataBaseHelper.Options()))
+            {
+                var reyses = db.ReysBD.FirstOrDefault(x => x.Id == reys.Id);
+                if (reyses != null)
+                {
+                   reyses.SborP=reys.SborP;
+                   reyses.SborC=reys.SborC;
+                   reyses.NumberCrew=reys.NumberCrew;
+                   reyses.NumberReys=reys.NumberReys;
+                   reyses.NumberPassengers=reys.NumberPassengers;
+                   reyses.allowance = reys.allowance;
+                   reyses.arrivalTime=reys.arrivalTime;
+                   reyses.Plane=reys.Plane;
+                   reyses.Sum=reys.Sum;
+                   db.SaveChanges();
+                   dataGridView1.DataSource = db.ReysBD.ToList();
+                   CalculateStats();
+                }
+            }
+        }
+        private void DeliteDB(Reys reys)
+        {
+            using (ApplicationContext db = new ApplicationContext(DataBaseHelper.Options()))
+            {
+                var reyses = db.ReysBD.FirstOrDefault(x => x.NumberReys == reys.NumberReys);
+                if (reyses != null)
+                {
+                    db.ReysBD.Remove(reyses);
+                    db.SaveChanges();
+                    dataGridView1.DataSource = db.ReysBD.ToList();
+                    CalculateStats();
+                }
+            }
+        }
 
     }
 
